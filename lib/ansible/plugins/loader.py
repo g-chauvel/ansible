@@ -278,13 +278,15 @@ class PluginLoader:
 
     def _load_config_defs(self, name, module, path):
         ''' Reads plugin docs to find configuration setting definitions, to push to config manager for later use '''
-
+        display.debug("ANSIBLE DEBUG LOADCONFDEF 1")
         # plugins w/o class name don't support config
         if self.class_name:
+            display.debug("ANSIBLE DEBUG LOADCONFDEF 2")
             type_name = get_plugin_class(self.class_name)
-
+            display.debug("ANSIBLE DEBUG LOADCONFDEF 3")
             # if type name != 'module_doc_fragment':
             if type_name in C.CONFIGURABLE_PLUGINS:
+                display.debug("ANSIBLE DEBUG LOADCONFDEF 4")
                 dstring = AnsibleLoader(getattr(module, 'DOCUMENTATION', ''), file_name=path).get_single_data()
                 if dstring:
                     add_fragments(dstring, path, fragment_loader=fragment_loader)
@@ -292,6 +294,7 @@ class PluginLoader:
                 if dstring and 'options' in dstring and isinstance(dstring['options'], dict):
                     C.config.initialize_plugin_configuration_definitions(type_name, name, dstring['options'])
                     display.debug('Loaded config def from plugin (%s/%s)' % (type_name, name))
+            display.debug("ANSIBLE DEBUG LOADCONFDEF 5")
 
     def add_directory(self, directory, with_subdir=False):
         ''' Adds an additional directory to the search path '''
@@ -506,28 +509,35 @@ class PluginLoader:
     __contains__ = has_plugin
 
     def _load_module_source(self, name, path):
-
+        display.debug("ANSIBLE DEBUG LOADMODSRC 1")
         # avoid collisions across plugins
         if name.startswith('ansible_collections.'):
             full_name = name
         else:
             full_name = '.'.join([self.package, name])
-
+        display.debug("ANSIBLE DEBUG LOADMODSRC 2")
         if full_name in sys.modules:
             # Avoids double loading, See https://github.com/ansible/ansible/issues/13110
             return sys.modules[full_name]
-
+        display.debug("ANSIBLE DEBUG LOADMODSRC 3")
         with warnings.catch_warnings():
+            display.debug("ANSIBLE DEBUG LOADMODSRC 4")
             warnings.simplefilter("ignore", RuntimeWarning)
             if imp is None:
+                display.debug("ANSIBLE DEBUG LOADMODSRC 4-1")
                 spec = importlib.util.spec_from_file_location(to_native(full_name), to_native(path))
+                display.debug("ANSIBLE DEBUG LOADMODSRC 4-2")
                 module = importlib.util.module_from_spec(spec)
+                display.debug("ANSIBLE DEBUG LOADMODSRC 4-3")
                 spec.loader.exec_module(module)
+                display.debug("ANSIBLE DEBUG LOADMODSRC 4-4")
                 sys.modules[full_name] = module
             else:
+                display.debug("ANSIBLE DEBUG LOADMODSRC 4-5")
                 with open(to_bytes(path), 'rb') as module_file:
                     # to_native is used here because imp.load_source's path is for tracebacks and python's traceback formatting uses native strings
                     module = imp.load_source(to_native(full_name), to_native(path), module_file)
+        display.debug("ANSIBLE DEBUG LOADMODSRC 5")
         return module
 
     def _update_object(self, obj, name, path):
@@ -538,7 +548,7 @@ class PluginLoader:
 
     def get(self, name, *args, **kwargs):
         ''' instantiates a plugin of the given name using arguments '''
-
+        display.debug("ANSIBLE DEBUG 11111111111111111111111111111")
         found_in_cache = True
         class_only = kwargs.pop('class_only', False)
         collection_list = kwargs.pop('collection_list', None)
@@ -630,6 +640,8 @@ class PluginLoader:
 
         global _PLUGIN_FILTERS
 
+        display.debug("ANSIBLE DEBUG 22222222222222222222222222222")
+
         dedupe = kwargs.pop('_dedupe', True)
         path_only = kwargs.pop('path_only', False)
         class_only = kwargs.pop('class_only', False)
@@ -641,47 +653,54 @@ class PluginLoader:
         found_in_cache = True
 
         for i in self._get_paths():
+            display.debug("ANSIBLE DEBUG ALL 1")
             all_matches.extend(glob.glob(os.path.join(i, "*.py")))
-
+        display.debug("ANSIBLE DEBUG ALL 2")
         loaded_modules = set()
         for path in sorted(all_matches, key=os.path.basename):
+            display.debug("ANSIBLE DEBUG ALL 3")
             name = os.path.splitext(path)[0]
             basename = os.path.basename(name)
 
             if basename == '__init__' or basename in _PLUGIN_FILTERS[self.package]:
                 continue
-
+            display.debug("ANSIBLE DEBUG ALL 4")
             if dedupe and basename in loaded_modules:
                 continue
             loaded_modules.add(basename)
-
+            display.debug("ANSIBLE DEBUG ALL 5")
             if path_only:
                 yield path
                 continue
-
+            display.debug("ANSIBLE DEBUG ALL 6")
             if path not in self._module_cache:
                 try:
+                    display.debug("ANSIBLE DEBUG ALL 6-1")
                     if self.subdir in ('filter_plugins', 'test_plugins'):
                         # filter and test plugin files can contain multiple plugins
                         # they must have a unique python module name to prevent them from shadowing each other
                         full_name = '{0}_{1}'.format(abs(hash(path)), basename)
                     else:
                         full_name = basename
+                    display.debug("ANSIBLE DEBUG ALL 6-2")
                     module = self._load_module_source(full_name, path)
+                    display.debug("ANSIBLE DEBUG ALL 6-3")
                     self._load_config_defs(basename, module, path)
+                    display.debug("ANSIBLE DEBUG ALL 6-4")
                 except Exception as e:
                     display.warning("Skipping plugin (%s) as it seems to be invalid: %s" % (path, to_text(e)))
                     continue
                 self._module_cache[path] = module
                 found_in_cache = False
-
+            display.debug("ANSIBLE DEBUG ALL 7")
             try:
                 obj = getattr(self._module_cache[path], self.class_name)
             except AttributeError as e:
                 display.warning("Skipping plugin (%s) as it seems to be invalid: %s" % (path, to_text(e)))
                 continue
-
+            display.debug("ANSIBLE DEBUG ALL 8")
             if self.base_class:
+                display.debug("ANSIBLE DEBUG ALL 9")
                 # The import path is hardcoded and should be the right place,
                 # so we are not expecting an ImportError.
                 module = __import__(self.package, fromlist=[self.base_class])
@@ -692,7 +711,7 @@ class PluginLoader:
                     continue
                 if not issubclass(obj, plugin_class):
                     continue
-
+            display.debug("ANSIBLE DEBUG ALL 10")
             self._display_plugin_load(self.class_name, basename, self._searched_paths, path, found_in_cache=found_in_cache, class_only=class_only)
 
             if not class_only:
@@ -703,7 +722,7 @@ class PluginLoader:
 
             self._update_object(obj, basename, path)
             yield obj
-
+        display.debug("ANSIBLE DEBUG ALL END")
 
 class Jinja2Loader(PluginLoader):
     """

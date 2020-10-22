@@ -101,15 +101,19 @@ class TaskExecutor:
         display.debug("in run() - task %s" % self._task._uuid)
 
         try:
+            display.debug("DEBUG ANSIBLE RUN 1")
             try:
+                display.debug("DEBUG ANSIBLE RUN 2")
                 items = self._get_loop_items()
             except AnsibleUndefinedVariable as e:
                 # save the error raised here for use later
                 items = None
                 self._loop_eval_error = e
-
+            display.debug("DEBUG ANSIBLE RUN 3")
             if items is not None:
+                display.debug("DEBUG ANSIBLE RUN 4")
                 if len(items) > 0:
+                    display.debug("DEBUG ANSIBLE RUN 5")
                     item_results = self._run_loop(items)
 
                     # create the overall result item
@@ -117,6 +121,7 @@ class TaskExecutor:
 
                     # loop through the item results, and set the global changed/failed result flags based on any item.
                     for item in item_results:
+                        display.debug("DEBUG ANSIBLE RUN 6")
                         if 'changed' in item and item['changed'] and not res.get('changed'):
                             res['changed'] = True
                         if 'failed' in item and item['failed']:
@@ -127,7 +132,7 @@ class TaskExecutor:
                                 self._task.ignore_errors = item_ignore
                             elif self._task.ignore_errors and not item_ignore:
                                 self._task.ignore_errors = item_ignore
-
+                        display.debug("DEBUG ANSIBLE RUN 7")
                         # ensure to accumulate these
                         for array in ['warnings', 'deprecations']:
                             if array in item and item[array]:
@@ -137,6 +142,7 @@ class TaskExecutor:
                                     item[array] = [item[array]]
                                 res[array] = res[array] + item[array]
                                 del item[array]
+                        display.debug("DEBUG ANSIBLE RUN 8")
 
                     if not res.get('Failed', False):
                         res['msg'] = 'All items completed'
